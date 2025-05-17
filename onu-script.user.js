@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Copiar dados ONU - Luiz Toledo
 // @namespace    http://tampermonkey.net/
-// @version      3.0.2
+// @version      3.1.0
 // @description  Copia Informações + Status GPON
 // @author       Luiz Toledo
 // @match        https://autoisp.gegnet.com.br/contracted_services/*
@@ -34,7 +34,6 @@
       btn.textContent = texto;
       btn.className = `btn btn-${cor}`;
       btn.style.margin = '5px';
-
       const container = document.querySelector('.general-buttons-wrapper.card-body');
       if (container) container.appendChild(btn);
       else {
@@ -42,14 +41,13 @@
         document.body.appendChild(btn);
       }
     }
-
     btn.onclick = aoClicar;
   }
 
   function copiarDadosONU() {
+
     const info = [...document.querySelectorAll('table.w-100.borderless-table.table-stripline')]
       .find(t => /OLT/.test(t.innerText) && /ONU ID/.test(t.innerText));
-
     let descOLT = '', olt = '', pon = '', onuid = '';
     if (info) {
       info.querySelectorAll('tr').forEach(tr => {
@@ -65,7 +63,9 @@
       });
     }
 
-    const serial = document.querySelector('span.w-100.text-end[style*="font-size: 14pt"]')?.textContent.trim() || '';
+
+    const serial = document.querySelector('.w-100.text-end[style*="font-size: 14pt"]')?.textContent.trim() || '';
+
 
     const statusLinhas = [...document.querySelectorAll('b.subtitle-card')]
       .find(b => b.textContent.includes('Diagnóstico GPON'))
@@ -96,13 +96,17 @@
           .querySelector('td')
       ) || '';
 
-    const servicePort = [...document.querySelectorAll('td.text-start > div')]
-      .find(div => /^\d+$/.test(div.textContent.trim()))
-      ?.textContent.trim() || '';
+
+    const spRow = [...document.querySelectorAll('tr')]
+      .find(tr => tr.querySelector('th')?.textContent.trim() === 'Service Port');
+    const servicePort = spRow
+      ? obterTexto(spRow.querySelector('td'))
+      : '';
 
     const rxOnu = dados["Atenuação Rx ONU"] || '';
     const isLoss = !/\d/.test(rxOnu) || /(loss|los|sem sinal|no signal)/i.test(rxOnu);
     const status = isLoss ? 'DOWN' : 'UP';
+
 
     const linhas = [
       '[DADOS DA ONU]',
@@ -124,32 +128,32 @@
       alert('Dados copiados para a área de transferência!');
     });
 
+
     if (isLoss) {
       const msgLoss = [
-  '',
-  '-------------------TESTES REALIZADOS PELO CSA E INFORMAÇÕES ROTEADOR/ONU-------------',
-  '',
-  'Verificado ONU DOWN ( LINK LOSS )',
-  `ONU está localizada em: ${descOLT}`,
-  `Link: ${olt} ${pon} ID ${onuid}`,
-  `Service Port: ${servicePort}`,
-  `VLAN: ${vlan}`,
-  `Modelo da ONU: ${dados["Modelo de ONU"] || 'Não Disponível'}`,
-  '',
-  'Plano desconectado desde:',
-  'Motivo da desconexão: ',
-  '',
-  'Demais clientes da caixa estão UP',
-  'Energia confirmada',
-  'Equipamentos reiniciados, porém, sem sucesso.',
-  'Cabos verificados.',
-  '',
-  '',
-  '-------------------INFORMAÇÕES PARA LOGÍSTICA COLOCAR NA ORDEM DE SERVIÇO PARA O TÉCNICO EXECUTAR -------------------',
-  'Cliente está sem acesso à internet, a ONU está Down com link loss.',
-  'Favor encaminhar técnico verificar.'
-].join('\n');
-
+        '',
+        '-------------------TESTES REALIZADOS PELO CSA E INFORMAÇÕES ROTEADOR/ONU-------------',
+        '',
+        'Verificado ONU DOWN ( LINK LOSS )',
+        `ONU está localizada em: ${descOLT}`,
+        `Link: ${olt} ${pon} ID ${onuid}`,
+        `Service Port: ${servicePort}`,
+        `VLAN: ${vlan}`,
+        `Modelo da ONU: ${dados["Modelo de ONU"] || 'Não Disponível'}`,
+        '',
+        'Plano desconectado desde:',
+        'Motivo da desconexão: ',
+        '',
+        'Demais clientes da caixa estão UP',
+        'Energia confirmada',
+        'Equipamentos reiniciados, porém, sem sucesso.',
+        'Cabos verificados.',
+        '',
+        '',
+        '-------------------INFORMAÇÕES PARA LOGÍSTICA COLOCAR NA ORDEM DE SERVIÇO PARA O TÉCNICO EXECUTAR -------------------',
+        'Cliente está sem acesso à internet, a ONU está Down com link loss.',
+        'Favor encaminhar técnico verificar.'
+      ].join('\n');
 
       criarBotao('btn-onu-down', '🚨 Teste ONU LOSS', 'danger', () => {
         navigator.clipboard.writeText(msgLoss);
@@ -158,5 +162,29 @@
     }
   }
 
-  window.addEventListener('load', () => setTimeout(copiarDadosONU, 1500));
+
+  function observarAlerta() {
+    const observer = new MutationObserver((mutations, obs) => {
+      for (const m of mutations) {
+        for (const node of m.addedNodes) {
+          if (node.nodeType === 1) {
+            const el = /** @type {HTMLElement} */(node);
+            if (
+              el.matches('div.alert-success.alert-dismissible.show') &&
+              el.textContent.includes('ONU: Status da ONU atualizado com sucesso')
+            ) {
+              obs.disconnect();
+              copiarDadosONU();
+              return;
+            }
+          }
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+
+  window.addEventListener('load', observarAlerta);
+
 })();
