@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Copiar dados ONU - Luiz Toledo
 // @namespace    http://tampermonkey.net/
-// @version      3.0.0
+// @version      3.0.1
 // @description  Copia Informações + Status GPON
 // @author       Luiz Toledo
 // @match        https://autoisp.gegnet.com.br/contracted_services/*
