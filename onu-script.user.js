@@ -158,5 +158,5 @@
     }
   }
 
-  window.addEventListener('load', () => setTimeout(copiarDadosONU, 2000));
+  window.addEventListener('load', () => setTimeout(copiarDadosONU, 3500));
 })();
