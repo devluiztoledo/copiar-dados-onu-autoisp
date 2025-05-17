@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Copiar dados ONU - Luiz Toledo
 // @namespace    http://tampermonkey.net/
-// @version      2.0.2
+// @version      3.0.0
 // @description  Copia Informações + Status GPON
 // @author       Luiz Toledo
 // @match        https://autoisp.gegnet.com.br/contracted_services/*
@@ -26,13 +26,13 @@
     return td.textContent.trim();
   }
 
-  function criarBotaoCopiar(texto) {
-    let btn = document.getElementById('btn-copiar-onu');
+  function criarBotao(id, texto, cor, aoClicar) {
+    let btn = document.getElementById(id);
     if (!btn) {
       btn = document.createElement('button');
-      btn.id = 'btn-copiar-onu';
-      btn.textContent = '📋 Copiar Dados ONU';
-      btn.className = 'btn btn-success';
+      btn.id = id;
+      btn.textContent = texto;
+      btn.className = `btn btn-${cor}`;
       btn.style.margin = '5px';
 
       const container = document.querySelector('.general-buttons-wrapper.card-body');
@@ -43,16 +43,7 @@
       }
     }
 
-    btn.onclick = () => {
-      const copy = txt => navigator.clipboard
-        ? navigator.clipboard.writeText(txt)
-        : alert('Navegador não suporta cópia automática.');
-
-      copy(btn.dataset.texto);
-      alert('Dados copiados para a área de transferência!');
-    };
-
-    btn.dataset.texto = texto;
+    btn.onclick = aoClicar;
   }
 
   function copiarDadosONU() {
@@ -74,11 +65,7 @@
       });
     }
 
-
-    let serial = "";
-    const serialDiv = [...document.querySelectorAll('div')]
-      .find(div => /^[A-F0-9]{16}$/i.test(div.textContent.trim()));
-    if (serialDiv) serial = serialDiv.textContent.trim();
+    const serial = document.querySelector('span.w-100.text-end[style*="font-size: 14pt"]')?.textContent.trim() || '';
 
     const statusLinhas = [...document.querySelectorAll('b.subtitle-card')]
       .find(b => b.textContent.includes('Diagnóstico GPON'))
@@ -109,17 +96,13 @@
           .querySelector('td')
       ) || '';
 
-
-    let servicePort = "";
-    const linhaServicePort = [...document.querySelectorAll('tr')]
-      .find(tr => tr.querySelector('th')?.textContent.trim() === "Service Port");
-    if (linhaServicePort) {
-      const td = linhaServicePort.querySelector('td');
-      if (td) servicePort = obterTexto(td);
-    }
+    const servicePort = [...document.querySelectorAll('td.text-start > div')]
+      .find(div => /^\d+$/.test(div.textContent.trim()))
+      ?.textContent.trim() || '';
 
     const rxOnu = dados["Atenuação Rx ONU"] || '';
-    const status = /\d/.test(rxOnu) ? 'UP' : 'DOWN';
+    const isLoss = !/\d/.test(rxOnu) || /(loss|los|sem sinal|no signal)/i.test(rxOnu);
+    const status = isLoss ? 'DOWN' : 'UP';
 
     const linhas = [
       '[DADOS DA ONU]',
@@ -136,7 +119,43 @@
     ];
     if (status === 'DOWN') linhas.push(`Alarmes: ${alarmes || 'Sem info'}`);
 
-    criarBotaoCopiar(linhas.join('\n'));
+    criarBotao('btn-copiar-onu', '📋 Copiar Dados ONU', 'success', () => {
+      navigator.clipboard.writeText(linhas.join('\n'));
+      alert('Dados copiados para a área de transferência!');
+    });
+
+    if (isLoss) {
+      const msgLoss = [
+  '',
+  '-------------------TESTES REALIZADOS PELO CSA E INFORMAÇÕES ROTEADOR/ONU-------------',
+  '',
+  'Verificado ONU DOWN ( LINK LOSS )',
+  `ONU está localizada em: ${descOLT}`,
+  `Link: ${olt} ${pon} ID ${onuid}`,
+  `Service Port: ${servicePort}`,
+  `VLAN: ${vlan}`,
+  `Modelo da ONU: ${dados["Modelo de ONU"] || 'Não Disponível'}`,
+  '',
+  'Plano desconectado desde:',
+  'Motivo da desconexão: ',
+  '',
+  'Demais clientes da caixa estão UP',
+  'Energia confirmada',
+  'Equipamentos reiniciados, porém, sem sucesso.',
+  'Cabos verificados.',
+  '',
+  '',
+  '-------------------INFORMAÇÕES PARA LOGÍSTICA COLOCAR NA ORDEM DE SERVIÇO PARA O TÉCNICO EXECUTAR -------------------',
+  'Cliente está sem acesso à internet, a ONU está Down com link loss.',
+  'Favor encaminhar técnico verificar.'
+].join('\n');
+
+
+      criarBotao('btn-onu-down', '🚨 Teste ONU LOSS', 'danger', () => {
+        navigator.clipboard.writeText(msgLoss);
+        alert('Teste ONU Down copiado!');
+      });
+    }
   }
 
   window.addEventListener('load', () => setTimeout(copiarDadosONU, 2000));
