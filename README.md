@@ -17,7 +17,7 @@ Este repositório contém um **script para Tampermonkey** que automatiza a **có
 1. Instale a extensão [Tampermonkey](https://www.tampermonkey.net/) no seu navegador.
 2. Clique no botão abaixo para instalar diretamente:
 
-👉 **[Instalar Script](https://github.com/devluiztoledo/copiar-dados-onu-autoisp)**
+👉 **[Instalar Script](https://raw.githubusercontent.com/devluiztoledo/copiar-dados-onu-autoisp/main/onu-script.user.js)**
 
 
 ---
