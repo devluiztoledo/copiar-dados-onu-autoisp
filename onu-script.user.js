@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Copiar dados ONU - Luiz Toledo
 // @namespace    http://tampermonkey.net/
-// @version      2.0.1
+// @version      2.0.2
 // @description  Copia Informações + Status GPON
 // @author       Luiz Toledo
 // @match        https://autoisp.gegnet.com.br/contracted_services/*
@@ -11,7 +11,7 @@
 // @grant        GM_setClipboard
 // ==/UserScript==
 
-(function() {
+(function () {
   'use strict';
 
   function obterTexto(td) {
@@ -74,14 +74,18 @@
       });
     }
 
-    const serial = document.querySelector('span.w-100.text-end[style*="font-size: 14pt"]')?.textContent.trim() || '';
+
+    let serial = "";
+    const serialDiv = [...document.querySelectorAll('div')]
+      .find(div => /^[A-F0-9]{16}$/i.test(div.textContent.trim()));
+    if (serialDiv) serial = serialDiv.textContent.trim();
 
     const statusLinhas = [...document.querySelectorAll('b.subtitle-card')]
       .find(b => b.textContent.includes('Diagnóstico GPON'))
       ?.nextElementSibling.querySelectorAll('table.borderless-table tbody tr') || [];
 
     const dados = {};
-    const campos = ["Modelo de ONU","Firmware da ONU","Atenuação Rx ONU","Atenuação Rx OLT","Uptime da ONU"];
+    const campos = ["Modelo de ONU", "Firmware da ONU", "Atenuação Rx ONU", "Atenuação Rx OLT", "Uptime da ONU"];
     statusLinhas.forEach(tr => {
       const th = tr.querySelector('th')?.textContent.trim();
       let td = obterTexto(tr.querySelector('td'));
@@ -105,9 +109,14 @@
           .querySelector('td')
       ) || '';
 
-    const servicePort = [...document.querySelectorAll('td.text-start > div')]
-      .find(div => /^\d+$/.test(div.textContent.trim()))
-      ?.textContent.trim() || '';
+
+    let servicePort = "";
+    const linhaServicePort = [...document.querySelectorAll('tr')]
+      .find(tr => tr.querySelector('th')?.textContent.trim() === "Service Port");
+    if (linhaServicePort) {
+      const td = linhaServicePort.querySelector('td');
+      if (td) servicePort = obterTexto(td);
+    }
 
     const rxOnu = dados["Atenuação Rx ONU"] || '';
     const status = /\d/.test(rxOnu) ? 'UP' : 'DOWN';
