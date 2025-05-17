@@ -1,3 +1,17 @@
+**IMPORTANTE!**
+**DESATIVAR SCRIPTS ANTIGOS DE DOCUMENTAÇÃO DE ONU NO TAMPERMONKEY**
+---
+
+## 🚀 Como instalar no Tampermonkey
+
+1. Instale a extensão [Tampermonkey](https://www.tampermonkey.net/) no seu navegador.
+2. Clique no botão abaixo para instalar diretamente:
+
+👉 **[Instalar Script](https://raw.githubusercontent.com/devluiztoledo/copiar-dados-onu-autoisp/main/onu-script.user.js)**
+
+
+---
+
 # 📄 Script Tampermonkey – Copiar Dados da ONU
 
 Este repositório contém um **script para Tampermonkey** que automatiza a **cópia de dados de tabelas da ONU**, facilitando o trabalho de coleta de informações para análise e exportação.
@@ -9,15 +23,6 @@ Este repositório contém um **script para Tampermonkey** que automatiza a **có
 - Detecta automaticamente a tabela de dados no site da ONU.
 - Copia os dados visíveis de forma estruturada (CSV ou outro formato).
 - Facilita colar em testes
-
----
-
-## 🚀 Como instalar no Tampermonkey
-
-1. Instale a extensão [Tampermonkey](https://www.tampermonkey.net/) no seu navegador.
-2. Clique no botão abaixo para instalar diretamente:
-
-👉 **[Instalar Script](https://raw.githubusercontent.com/devluiztoledo/copiar-dados-onu-autoisp/main/onu-script.user.js)**
 
 
 ---
