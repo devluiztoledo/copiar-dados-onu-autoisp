@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name         A1 Copiar dados ONU - Luiz Toledo
 // @namespace    http://tampermonkey.net/
-// @version      3.2.0
+// @version      3.3.0
 // @description  Copia Informações + Status GPON
 // @author       Luiz Toledo
 // @match        https://autoisp.gegnet.com.br/contracted_services/*
 // @match        https://autoisp.gegnet.com.br/gpon_clients/*
 // @updateURL    https://raw.githubusercontent.com/devluiztoledo/copiar-dados-onu-autoisp/main/onu-script.user.js
 // @downloadURL  https://raw.githubusercontent.com/devluiztoledo/copiar-dados-onu-autoisp/main/onu-script.user.js
+// @icon         https://raw.githubusercontent.com/devluiztoledo/copiar-dados-onu-autoisp/main/icon.png
 // @grant        GM_setClipboard
 // ==/UserScript==
 
