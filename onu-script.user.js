@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         A1 Copiar dados ONU - Luiz Toledo
 // @namespace    http://tampermonkey.net/
-// @version      4.0
+// @version      4.1
 // @description  Copia Informações + Status GPON
 // @author       Luiz Toledo
 // @match        https://autoisp.gegnet.com.br/contracted_services/*
@@ -52,7 +52,7 @@
     }
 
     function copiarDadosONU() {
-        
+
         const info = [...document.querySelectorAll('table.w-100.borderless-table.table-stripline')]
             .find(t => /OLT/.test(t.innerText) && /ONU ID/.test(t.innerText));
         let descOLT = '', olt = '', pon = '', onuid = '';
@@ -68,7 +68,7 @@
             });
         }
 
-        
+
         let causaQueda = '';
         const thCausa = [...document.querySelectorAll('th')]
             .find(th => th.textContent.trim() === 'Causa da Última queda');
@@ -76,89 +76,89 @@
             causaQueda = obterTexto(thCausa.nextElementSibling);
         }
 
+
         const serial = document.querySelector('.w-100.text-end[style*="font-size: 14pt"]')
             ?.textContent.trim() || '';
 
-        
+
         const statusTable = [...document.querySelectorAll('b.subtitle-card')]
             .find(b => b.textContent.includes('Diagnóstico GPON'))
             ?.nextElementSibling;
+
+
         const rows = statusTable
             ? statusTable.querySelectorAll('table.borderless-table tbody tr')
             : [];
-
         const dados = {};
-        const campos = ["Modelo de ONU", "Firmware da ONU", "Atenuação Rx ONU", "Atenuação Rx OLT", "Uptime da ONU"];
+        const campos = ["Modelo de ONU","Firmware da ONU","Atenuação Rx ONU","Atenuação Rx OLT","Uptime da ONU"];
         rows.forEach(tr => {
             const label = tr.querySelector('th')?.textContent.trim();
             let valor = obterTexto(tr.querySelector('td'));
-            if (label === 'Firmware da ONU') {
-                valor = valor.replace(/(valid|invalid),?\s?(not\s)?committed/gi, '').trim();
-            }
+            if (label === 'Firmware da ONU') valor = valor.replace(/(valid|invalid),?\s?(not\s)?committed/gi,'').trim();
             if (campos.includes(label)) dados[label] = valor;
         });
 
-        
-        const thAl = [...document.querySelectorAll('th')].find(th => th.textContent.trim() === 'Alarmes');
+
+        const thAl = [...document.querySelectorAll('th')].find(th=>th.textContent.trim()==='Alarmes');
         const alarmes = thAl ? obterTexto(thAl.nextElementSibling) : '';
-
-        const trVl = [...document.querySelectorAll('tr')]
-            .find(tr => tr.querySelector('th')?.textContent.trim() === 'VLAN (do perfil)');
+        const trVl = [...document.querySelectorAll('tr')].find(tr=>tr.querySelector('th')?.textContent.trim()==='VLAN (do perfil)');
         const vlan = trVl ? obterTexto(trVl.querySelector('td')) : '';
-
-        const trSp = [...document.querySelectorAll('tr')]
-            .find(tr => tr.querySelector('th')?.textContent.trim() === 'Service Port');
+        const trSp = [...document.querySelectorAll('tr')].find(tr=>tr.querySelector('th')?.textContent.trim()==='Service Port');
         const servicePort = trSp ? obterTexto(trSp.querySelector('td')) : '';
 
-        
-        const rxOnu = dados["Atenuação Rx ONU"] || '';
-        const isLoss = !/\d/.test(rxOnu) || /(loss|los|sem sinal|no signal)/i.test(rxOnu);
-        const status = isLoss ? 'DOWN' : 'UP';
 
-        
+        const rxOnu = dados["Atenuação Rx ONU"]||'';
+        const isLoss = !/\d/.test(rxOnu) || /(loss|los|sem sinal|no signal)/i.test(rxOnu);
+
         const linhas = [
             '[DADOS DA ONU]',
             `Local: ${descOLT}`,
             `Link: ${olt} ${pon} ID ${onuid}`,
             `Service Port: ${servicePort}`,
             `VLAN: ${vlan}`,
-            `Modelo: ${dados["Modelo de ONU"] || ''}`,
+            `Modelo: ${dados["Modelo de ONU"]||''}`,
             `Serial: ${serial}`,
-            `Firmware: ${dados["Firmware da ONU"] || ''}`,
-            `Rx ONU: ${rxOnu} (${status})`,
-            `Rx OLT: ${dados["Atenuação Rx OLT"] || ''}`,
-            `Uptime: ${dados["Uptime da ONU"] || ''}`
+            `Firmware: ${dados["Firmware da ONU"]||''}`,
+            `Rx ONU: ${rxOnu} (${isLoss?'DOWN':'UP'})`,
+            `Rx OLT: ${dados["Atenuação Rx OLT"]||''}`,
+            `Uptime: ${dados["Uptime da ONU"]||''}`
         ];
-        if (status === 'DOWN') linhas.push(`Alarmes: ${alarmes || 'Sem info'}`);
+        if (isLoss) linhas.push(`Alarmes: ${alarmes||'Sem info'}`);
 
-        criarBotao('btn-copiar-onu', '📋 Copiar Dados ONU', 'success', () => {
+        criarBotao('btn-copiar-onu','📋 Copiar Dados ONU','success',()=>{
             const txt = linhas.join('\n');
-            if (typeof GM_setClipboard !== 'undefined') GM_setClipboard(txt);
-            else navigator.clipboard.writeText(txt);
-            
+            typeof GM_setClipboard!=='undefined'
+                ? GM_setClipboard(txt)
+                : navigator.clipboard.writeText(txt);
         });
 
-        
-        if (isLoss) {
-            const tabTools = document.querySelector('.tab-pane#tab-tools');
-            let dataQueda = '–';
-            let ultimoSinal = '–';
 
-            if (tabTools) {
-                tabTools.querySelectorAll('table').forEach(table => {
-                    const headers = [...table.querySelectorAll('th')].map(th => th.textContent.trim());
+        if (isLoss && statusTable) {
+            let dataQueda='–', ultimoSinal='–';
+            statusTable.querySelectorAll('table').forEach(table => {
+                const headers = [...table.querySelectorAll('th')].map(th=>th.textContent.trim());
+                const idxData = headers.indexOf('Data');
+                const idxAnt = headers.indexOf('ONU RX Anterior');
+                if (idxData >= 0 && idxAnt >= 0) {
+                    for (const tr of table.querySelectorAll('tbody tr')) {
+                        const cells = tr.querySelectorAll('td');
+                        const dataLinha = cells[idxData]?.textContent.trim();
+                        const sinalAnt = cells[idxAnt]?.textContent.trim();
 
-                    if (headers.includes('Data') && headers.includes('ONU RX Anterior')) {
-                        const primeiraLinha = table.querySelector('tbody tr');
-                        if (primeiraLinha) {
-                            const cells = primeiraLinha.querySelectorAll('td');
-                            dataQueda = cells[0]?.textContent.trim() || '–';
-                            const idxAnterior = headers.indexOf('ONU RX Anterior');
-                            ultimoSinal = cells[idxAnterior]?.textContent.trim() || '–';
+                        if (dataQueda === '–' && dataLinha) {
+                            dataQueda = dataLinha;
+                        }
+
+                        if (ultimoSinal === '–' && sinalAnt) {
+                            ultimoSinal = sinalAnt;
+                        }
+
+                        if (dataQueda !== '–' && ultimoSinal !== '–') {
+                            break;
                         }
                     }
-                });
-            }
+                }
+            });
 
             const msgLoss = [
                 '',
@@ -168,12 +168,10 @@
                 `Link: ${olt} ${pon} ID ${onuid}`,
                 `Service Port: ${servicePort}`,
                 `VLAN: ${vlan}`,
-                `Modelo da ONU: ${dados["Modelo de ONU"] || 'Não Disponível'}`,
-                '',
+                `Modelo da ONU: ${dados["Modelo de ONU"]||'Não Disponível'}`,
                 `Plano desconectado desde: ${dataQueda}`,
                 `Motivo da desconexão: ${causaQueda}`,
                 `Último sinal ONU: ${ultimoSinal}`,
-                '',
                 'Demais clientes da caixa estão UP',
                 'Energia confirmada',
                 'Equipamentos reiniciados sem sucesso',
@@ -184,44 +182,33 @@
                 'Encaminhar técnico.'
             ].join('\n');
 
-            criarBotao('btn-onu-down', '🚨 Teste ONU LOSS', 'danger', () => {
-                if (typeof GM_setClipboard !== 'undefined') GM_setClipboard(msgLoss);
-                else navigator.clipboard.writeText(msgLoss);
-                
+            criarBotao('btn-onu-down','🚨 Teste ONU LOSS','danger',()=>{
+                typeof GM_setClipboard!=='undefined'
+                    ? GM_setClipboard(msgLoss)
+                    : navigator.clipboard.writeText(msgLoss);
             });
         }
     }
 
     function observarAlerta() {
-        const obs = new MutationObserver((muts, o) => {
-            for (const m of muts) {
-                for (const n of m.addedNodes) {
-                    if (n.nodeType !== 1) continue;
+        const obs = new MutationObserver((muts,o)=>{
+            for(const m of muts){
+                for(const n of m.addedNodes){
+                    if(n.nodeType!==1) continue;
                     const el = n;
-                    if (el.matches('div.alert-success.alert-dismissible.show') &&
-                        el.textContent.includes('Status da ONU atualizado com sucesso')) {
-                        alertaDetectado = true;
-                        o.disconnect();
-                        copiarDadosONU();
-                        return;
+                    if(el.matches('div.alert-success.alert-dismissible.show') &&
+                       el.textContent.includes('Status da ONU atualizado com sucesso')){
+                        alertaDetectado = true; o.disconnect(); copiarDadosONU(); return;
                     }
-                    if (el.matches('div.alert-danger.alert-dismissible.show') &&
-                        el.textContent.includes('Erro ao atualizar status da ONU')) {
-                        alertaDetectado = true;
-                        o.disconnect();
-                        copiarDadosONU();
-                        return;
+                    if(el.matches('div.alert-danger.alert-dismissible.show') &&
+                       el.textContent.includes('Erro ao atualizar status da ONU')){
+                        alertaDetectado = true; o.disconnect(); copiarDadosONU(); return;
                     }
                 }
             }
         });
-        obs.observe(document.body, { childList: true, subtree: true });
-        setTimeout(() => {
-            if (!alertaDetectado) {
-                obs.disconnect();
-                copiarDadosONU();
-            }
-        }, 10000);
+        obs.observe(document.body,{childList:true,subtree:true});
+        setTimeout(()=>{ if(!alertaDetectado){ obs.disconnect(); copiarDadosONU(); } },10000);
     }
 
     window.addEventListener('load', observarAlerta);
