@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         A1 Copiar dados ONU - Luiz Toledo
 // @namespace    http://tampermonkey.net/
-// @version      3.5
+// @version      4.0
 // @description  Copia Informações + Status GPON
 // @author       Luiz Toledo
 // @match        https://autoisp.gegnet.com.br/contracted_services/*
@@ -18,6 +18,7 @@
     let alertaDetectado = false;
 
     function obterTexto(td) {
+        if (!td) return '';
         const input = td.querySelector('input');
         if (input) return input.value.trim();
         const div = td.querySelector('div');
@@ -51,7 +52,7 @@
     }
 
     function copiarDadosONU() {
-
+        
         const info = [...document.querySelectorAll('table.w-100.borderless-table.table-stripline')]
             .find(t => /OLT/.test(t.innerText) && /ONU ID/.test(t.innerText));
         let descOLT = '', olt = '', pon = '', onuid = '';
@@ -59,7 +60,6 @@
             info.querySelectorAll('tr').forEach(tr => {
                 const th = tr.querySelector('th')?.textContent.trim();
                 const td = tr.querySelector('td');
-                if (!th || !td) return;
                 const v = obterTexto(td);
                 if (th === 'Descrição na OLT') descOLT = v;
                 if (th === 'OLT') olt = v;
@@ -68,54 +68,54 @@
             });
         }
 
+        
+        let causaQueda = '';
+        const thCausa = [...document.querySelectorAll('th')]
+            .find(th => th.textContent.trim() === 'Causa da Última queda');
+        if (thCausa) {
+            causaQueda = obterTexto(thCausa.nextElementSibling);
+        }
+
         const serial = document.querySelector('.w-100.text-end[style*="font-size: 14pt"]')
             ?.textContent.trim() || '';
 
-        const statusLinhas = [...document.querySelectorAll('b.subtitle-card')]
+        
+        const statusTable = [...document.querySelectorAll('b.subtitle-card')]
             .find(b => b.textContent.includes('Diagnóstico GPON'))
-            ?.nextElementSibling
-            .querySelectorAll('table.borderless-table tbody tr') || [];
+            ?.nextElementSibling;
+        const rows = statusTable
+            ? statusTable.querySelectorAll('table.borderless-table tbody tr')
+            : [];
 
         const dados = {};
-        const campos = ["Modelo de ONU","Firmware da ONU","Atenuação Rx ONU","Atenuação Rx OLT","Uptime da ONU"];
-        statusLinhas.forEach(tr => {
+        const campos = ["Modelo de ONU", "Firmware da ONU", "Atenuação Rx ONU", "Atenuação Rx OLT", "Uptime da ONU"];
+        rows.forEach(tr => {
             const label = tr.querySelector('th')?.textContent.trim();
             let valor = obterTexto(tr.querySelector('td'));
             if (label === 'Firmware da ONU') {
-                valor = valor.replace(/(valid|invalid),?\s?(not\s)?committed/gi,'').trim();
+                valor = valor.replace(/(valid|invalid),?\s?(not\s)?committed/gi, '').trim();
             }
             if (campos.includes(label)) dados[label] = valor;
         });
 
-        const alarmes = (() => {
-            const thA = [...document.querySelectorAll('th')]
-                .find(th => th.textContent.trim() === 'Alarmes');
-            if (!thA) return '';
-            const tdA = thA.nextElementSibling;
-            return tdA ? obterTexto(tdA) : '';
-        })();
+        
+        const thAl = [...document.querySelectorAll('th')].find(th => th.textContent.trim() === 'Alarmes');
+        const alarmes = thAl ? obterTexto(thAl.nextElementSibling) : '';
 
-        const vlan = (() => {
-            const trV = [...document.querySelectorAll('tr')]
-                .find(tr => tr.querySelector('th')?.textContent.trim() === 'VLAN (do perfil)');
-            if (!trV) return '';
-            const tdV = trV.querySelector('td');
-            return tdV ? obterTexto(tdV) : '';
-        })();
+        const trVl = [...document.querySelectorAll('tr')]
+            .find(tr => tr.querySelector('th')?.textContent.trim() === 'VLAN (do perfil)');
+        const vlan = trVl ? obterTexto(trVl.querySelector('td')) : '';
 
-        const servicePort = (() => {
-            const trSP = [...document.querySelectorAll('tr')]
-                .find(tr => tr.querySelector('th')?.textContent.trim() === 'Service Port');
-            if (!trSP) return '';
-            const tdSP = trSP.querySelector('td');
-            return tdSP ? obterTexto(tdSP) : '';
-        })();
+        const trSp = [...document.querySelectorAll('tr')]
+            .find(tr => tr.querySelector('th')?.textContent.trim() === 'Service Port');
+        const servicePort = trSp ? obterTexto(trSp.querySelector('td')) : '';
 
+        
         const rxOnu = dados["Atenuação Rx ONU"] || '';
         const isLoss = !/\d/.test(rxOnu) || /(loss|los|sem sinal|no signal)/i.test(rxOnu);
         const status = isLoss ? 'DOWN' : 'UP';
 
-
+        
         const linhas = [
             '[DADOS DA ONU]',
             `Local: ${descOLT}`,
@@ -131,19 +131,35 @@
         ];
         if (status === 'DOWN') linhas.push(`Alarmes: ${alarmes || 'Sem info'}`);
 
-
         criarBotao('btn-copiar-onu', '📋 Copiar Dados ONU', 'success', () => {
-            const text = linhas.join('\n');
-            if (typeof GM_setClipboard !== 'undefined') {
-                GM_setClipboard(text);
-            } else {
-                navigator.clipboard.writeText(text);
-            }
-            alert('Dados copiados para a área de transferência!');
+            const txt = linhas.join('\n');
+            if (typeof GM_setClipboard !== 'undefined') GM_setClipboard(txt);
+            else navigator.clipboard.writeText(txt);
+            
         });
 
-
+        
         if (isLoss) {
+            const tabTools = document.querySelector('.tab-pane#tab-tools');
+            let dataQueda = '–';
+            let ultimoSinal = '–';
+
+            if (tabTools) {
+                tabTools.querySelectorAll('table').forEach(table => {
+                    const headers = [...table.querySelectorAll('th')].map(th => th.textContent.trim());
+
+                    if (headers.includes('Data') && headers.includes('ONU RX Anterior')) {
+                        const primeiraLinha = table.querySelector('tbody tr');
+                        if (primeiraLinha) {
+                            const cells = primeiraLinha.querySelectorAll('td');
+                            dataQueda = cells[0]?.textContent.trim() || '–';
+                            const idxAnterior = headers.indexOf('ONU RX Anterior');
+                            ultimoSinal = cells[idxAnterior]?.textContent.trim() || '–';
+                        }
+                    }
+                });
+            }
+
             const msgLoss = [
                 '',
                 '--- TESTES CSA / ROTEADOR / ONU ---',
@@ -152,10 +168,11 @@
                 `Link: ${olt} ${pon} ID ${onuid}`,
                 `Service Port: ${servicePort}`,
                 `VLAN: ${vlan}`,
-                `Modelo: ${dados["Modelo de ONU"] || 'Não Disponível'}`,
+                `Modelo da ONU: ${dados["Modelo de ONU"] || 'Não Disponível'}`,
                 '',
-                'Plano desconectado desde:',
-                'Motivo da desconexão:',
+                `Plano desconectado desde: ${dataQueda}`,
+                `Motivo da desconexão: ${causaQueda}`,
+                `Último sinal ONU: ${ultimoSinal}`,
                 '',
                 'Demais clientes da caixa estão UP',
                 'Energia confirmada',
@@ -168,51 +185,44 @@
             ].join('\n');
 
             criarBotao('btn-onu-down', '🚨 Teste ONU LOSS', 'danger', () => {
-                if (typeof GM_setClipboard !== 'undefined') {
-                    GM_setClipboard(msgLoss);
-                } else {
-                    navigator.clipboard.writeText(msgLoss);
-                }
-                alert('Teste ONU Down copiado!');
+                if (typeof GM_setClipboard !== 'undefined') GM_setClipboard(msgLoss);
+                else navigator.clipboard.writeText(msgLoss);
+                
             });
         }
     }
 
     function observarAlerta() {
-        const observer = new MutationObserver((mutations, obs) => {
-            for (const m of mutations) {
-                for (const node of m.addedNodes) {
-                    if (node.nodeType !== 1) continue;
-                    const el = /** @type {HTMLElement} */(node);
-
+        const obs = new MutationObserver((muts, o) => {
+            for (const m of muts) {
+                for (const n of m.addedNodes) {
+                    if (n.nodeType !== 1) continue;
+                    const el = n;
                     if (el.matches('div.alert-success.alert-dismissible.show') &&
                         el.textContent.includes('Status da ONU atualizado com sucesso')) {
                         alertaDetectado = true;
-                        obs.disconnect();
+                        o.disconnect();
                         copiarDadosONU();
                         return;
                     }
-
                     if (el.matches('div.alert-danger.alert-dismissible.show') &&
                         el.textContent.includes('Erro ao atualizar status da ONU')) {
                         alertaDetectado = true;
-                        obs.disconnect();
+                        o.disconnect();
                         copiarDadosONU();
                         return;
                     }
                 }
             }
         });
-        observer.observe(document.body, { childList: true, subtree: true });
-
+        obs.observe(document.body, { childList: true, subtree: true });
         setTimeout(() => {
             if (!alertaDetectado) {
-                observer.disconnect();
+                obs.disconnect();
                 copiarDadosONU();
             }
         }, 10000);
     }
 
     window.addEventListener('load', observarAlerta);
-
 })();
